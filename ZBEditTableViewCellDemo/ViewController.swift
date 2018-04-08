@@ -63,8 +63,8 @@ extension ViewController : UITableViewDataSource {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: NSStringFromClass(TableViewCell.self)) as? TableViewCell
         cell?.fillCellWithModel(model: self.dataSource[indexPath.row] as? BaseModel)
-        cell?.dataSource = self
-        cell?.rehabilitateLastCellClosure = {[weak self] (lastcell : ZBEditTableViewCell?) in
+        cell?.addDataSource(self, indexPath: indexPath)
+        cell?.rehabilitateLastCellClosure = { [weak self] (lastcell : ZBEditTableViewCell?) in
             lastcell?.rehabilitateLastCell(cell: self?.currentCell)
             self?.currentCell = lastcell as? TableViewCell
         }
@@ -73,7 +73,39 @@ extension ViewController : UITableViewDataSource {
 }
 
 extension ViewController : EditTableViewCellDataSource {
-    func editTableViewCell(_ cell: ZBEditTableViewCell, didSelectItemAt index: Int) {
+    func numberOfItems(in cell: ZBEditTableViewCell,
+                       cellForRowAt indexPath: IndexPath) -> Int {
+        if indexPath.row == 0 {
+            return 1
+        }else if indexPath.row == 1{
+            return 0
+        }
+        return 2
+    }
+    
+    func editTableViewCell(_ cell: ZBEditTableViewCell,
+                           itemForIndex index: Int,
+                           cellForRowAt indexPath: IndexPath) -> UIButton {
+        return {
+            let item = UIButton.init(type: .custom)
+            item.backgroundColor = [UIColor.blue, UIColor.red][index]
+            item.setTitle(["编辑", "删除"][index], for: UIControlState.normal)
+            item.setTitleColor(UIColor.white, for: UIControlState.normal)
+            return item
+        }()
+    }
+    
+    func widthForItem(in cell: ZBEditTableViewCell,
+                      cellForRowAt indexPath: IndexPath) -> CGFloat {
+        if indexPath.row == 3 {
+            return 80
+        }
+        return 60
+    }
+    
+    func editTableViewCell(_ cell: ZBEditTableViewCell,
+                           didSelectItemAt index: Int,
+                           cellForRowAt indexPath: IndexPath) {
         switch index {
         case 0:
             
@@ -91,24 +123,6 @@ extension ViewController : EditTableViewCellDataSource {
         default: break
             
         }
-    }
-    
-    func editTableViewCell(_ cell: ZBEditTableViewCell, itemForIndex index: Int) -> UIButton {
-        return {
-            let item = UIButton.init(type: .custom)
-            item.backgroundColor = [UIColor.blue, UIColor.red][index]
-            item.setTitle(["编辑", "删除"][index], for: UIControlState.normal)
-            item.setTitleColor(UIColor.white, for: UIControlState.normal)
-            return item
-            }()
-    }
-    
-    func numberOfItems(in cell: ZBEditTableViewCell) -> Int {
-        return 2
-    }
-    
-    func widthForItem(in cell: ZBEditTableViewCell) -> CGFloat {
-        return 60
     }
 }
 

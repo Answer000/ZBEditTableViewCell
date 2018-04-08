@@ -14,26 +14,26 @@ import UIKit
      cell       ZBEditTableViewCell对象
      return     按钮的个数
      */
-    func numberOfItems(in cell: ZBEditTableViewCell) -> Int
+    func numberOfItems(in cell: ZBEditTableViewCell, cellForRowAt indexPath: IndexPath) -> Int
     
     /*
      cell       ZBEditTableViewCell对象
      index      按钮的下标值
      return     按钮对象
      */
-    func editTableViewCell(_ cell: ZBEditTableViewCell, itemForIndex index: Int) -> UIButton
+    func editTableViewCell(_ cell: ZBEditTableViewCell, itemForIndex index: Int, cellForRowAt indexPath: IndexPath) -> UIButton
     
     /*
      cell       ZBEditTableViewCell对象
      return     按钮宽度(默认70)
      */
-    @objc optional func widthForItem(in cell: ZBEditTableViewCell) -> CGFloat
+    @objc optional func widthForItem(in cell: ZBEditTableViewCell, cellForRowAt indexPath: IndexPath) -> CGFloat
     
     /*
      cell       ZBEditTableViewCell对象
      index      选择按钮的下标值
      */
-    @objc optional func editTableViewCell(_ cell: ZBEditTableViewCell, didSelectItemAt index: Int)
+    @objc optional func editTableViewCell(_ cell: ZBEditTableViewCell, didSelectItemAt index: Int, cellForRowAt indexPath: IndexPath)
 }
 
 class ZBEditTableViewCell: UITableViewCell {
@@ -59,6 +59,8 @@ class ZBEditTableViewCell: UITableViewCell {
         return tap
     }()
     
+    fileprivate var currentIndexPath : IndexPath = IndexPath.init()
+    
     // 是否处于删除状态
     fileprivate var isEditingState : Bool = false
     
@@ -75,25 +77,25 @@ class ZBEditTableViewCell: UITableViewCell {
     public var rehabilitateLastCellClosure : ((_ lastCell : ZBEditTableViewCell?) -> ())?
     
     // 编辑按钮的数据源代理
-    public var dataSource : EditTableViewCellDataSource? {
+    fileprivate var dataSource : EditTableViewCellDataSource? {
         didSet{
             guard let dataSource = dataSource else { return }
             
-            if dataSource.responds(to: #selector(dataSource.numberOfItems(in:))) == false {
-                assert(false, "dataSource.numberOfItems(in:) not implementation")
+            if dataSource.responds(to: #selector(dataSource.numberOfItems(in:cellForRowAt:))) == false {
+                assert(false, "dataSource.numberOfItems(in:cellForRowAt:) not implementation")
                 return
             }
             
-            if dataSource.responds(to: #selector(dataSource.editTableViewCell(_:itemForIndex:))) == false {
-                assert(false, "dataSource.editTableViewCell(_:itemForIndex:) not implementation")
+            if dataSource.responds(to: #selector(dataSource.editTableViewCell(_:itemForIndex:cellForRowAt:))) == false {
+                assert(false, "dataSource.editTableViewCell(_:itemForIndex:cellForRowAt:) not implementation")
                 return
             }
             
-            let number = dataSource.numberOfItems(in: self)
+            let number = dataSource.numberOfItems(in: self, cellForRowAt: self.currentIndexPath)
             if number == 0 { return }
             
-            if dataSource.responds(to: #selector(dataSource.widthForItem(in:))) {
-                if let width = dataSource.widthForItem?(in: self) {
+            if dataSource.responds(to: #selector(dataSource.widthForItem(in:cellForRowAt:))) {
+                if let width = dataSource.widthForItem?(in: self, cellForRowAt: self.currentIndexPath) {
                     itemWidth = width
                 }
             }
@@ -101,7 +103,7 @@ class ZBEditTableViewCell: UITableViewCell {
             self.itemContainerViewWidth = CGFloat(number) * itemWidth
             
             for i in 0..<number {
-                let item = dataSource.editTableViewCell(self, itemForIndex: i)
+                let item = dataSource.editTableViewCell(self, itemForIndex: i, cellForRowAt: self.currentIndexPath)
                 item.addTarget(self, action: #selector(itemAction(sender:)), for: UIControlEvents.touchUpInside)
                 item.tag = i
                 self.itemContainerView.addSubview(item)
@@ -111,11 +113,18 @@ class ZBEditTableViewCell: UITableViewCell {
             self.addGestureRecognizer(self.pan)
         }
     }
+    
+    public func addDataSource(_ dataSource: Any?,
+                              indexPath: IndexPath) {
+        self.currentIndexPath = indexPath
+        self.dataSource = dataSource as? EditTableViewCellDataSource
+    }
 
     // MARK:- 构造函数
     override init(style: UITableViewCellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         self.setup()
+        
     }
     
     required init?(coder aDecoder: NSCoder) {
@@ -131,10 +140,7 @@ class ZBEditTableViewCell: UITableViewCell {
     override func layoutSubviews() {
         super.layoutSubviews()
         
-        guard let dataSource = dataSource else {
-            return
-        }
-        if dataSource.numberOfItems(in: self) > 0 {
+        if self.itemContainerView.subviews.count > 0 {
             self.itemContainerView.frame.size = CGSize.init(width: itemContainerViewWidth, height: self.bounds.height)
             self.itemContainerView.frame.origin = CGPoint.init(x: self.bounds.width - itemContainerViewWidth, y: 0)
             
@@ -167,7 +173,7 @@ extension ZBEditTableViewCell {
             self.removeGestureRecognizer(self.tap)
         })
     }
-    
+
     // MARK:- 滑动手势监听方法
     @objc private func panGestureRecognizerAction(sender : UIPanGestureRecognizer) {
         
@@ -185,10 +191,11 @@ extension ZBEditTableViewCell {
             
         }else if sender.state == UIGestureRecognizerState.changed {
             
+            if self.contentView.frame.origin.x >= 0, offsetPoint.x > 0 {return}
             if  fabsf(Float(offsetPoint.y)) < 5,
                 self.contentView.frame.origin.x <= 0,
-                self.contentView.frame.origin.x > -(itemContainerViewWidth + 20),
-                offsetPoint.x < 0 {
+                self.contentView.frame.origin.x > -(itemContainerViewWidth + 20){
+                
                 let xValue = self.contentView.frame.origin.x + offsetPoint.x
                 self.contentView.frame.origin.x = xValue
             }
@@ -212,9 +219,7 @@ extension ZBEditTableViewCell {
                            animations:
                 {
                     self.contentView.frame.origin.x = x
-            }, completion: { (finished) in
-                
-            })
+            }, completion:nil)
         }
         
         // 复位
@@ -224,7 +229,7 @@ extension ZBEditTableViewCell {
     // MARK:- 按钮监听方法
     @objc private func itemAction(sender: UIButton) {
         self.closeAnimation()
-        dataSource?.editTableViewCell?(self, didSelectItemAt: sender.tag)
+        dataSource?.editTableViewCell?(self, didSelectItemAt: sender.tag, cellForRowAt: self.currentIndexPath)
     }
 }
 
